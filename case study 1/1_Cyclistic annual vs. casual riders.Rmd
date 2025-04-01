@@ -1,0 +1,300 @@
+---
+title: "Cyclistic annual members vs. casual riders"
+author: "Rachel Wooliver"
+date: "2025-03-27"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Business Task
+
+Cyclistic is a bikeshare company that would like to convert casual riders that pay per-ride or per-day into annual members that pay an annual fee to ride any day of the year. Annual memberships are both more cost-effective for customers and profitable for Cyclistic. The first business task is to *determine how annual members use bikes differently from casual riders.*
+
+
+# Data Sources
+
+Download the last 12 months (March 2024-February 2025) of Divvy trip data found at <https://divvy-tripdata.s3.amazonaws.com/index.html>, and store in a subdirectory titlee "raw-files". The data have been made available by Motivate International Inc. under this [license](https://divvybikes.com/data-license-agreement).
+
+*Note that riders’ personally identifiable information is of course not publicly available. This means that we won’t be able to connect pass purchases to credit card numbers to determine if casual riders live in the Cyclistic service area or if they have purchased multiple single passes.*
+
+This data source seems to be reliable, original, comprehensive, current, and cited.
+
+
+Read the data into R:
+```{r, message=F}
+# load tidyverse package
+library(tidyverse, verbose = F)
+
+# list all files
+files <- as.list(dir(pattern = "divvy-tripdata", path = "raw-data", full.names = T))
+
+# combine all of the data files into one table
+trip_data <- files %>% 
+  # read in all of the csv's in the files list
+  map_dfr(read_csv, show_col_types = FALSE)
+```
+
+# Data Cleaning & Manipulation 
+
+
+```{r, message=F}
+library(skimr)
+library(lubridate)
+
+# Remove lat and long data which are outside the continental USA
+trip_data <- trip_data %>% 
+  filter(end_lat < 50, end_lat > 25,
+         end_lng > (-125), end_lng < (-70))
+
+# Calculate trip duration
+trip_data <- trip_data %>% 
+  mutate(duration_minutes = as.numeric(ended_at - started_at)/60) 
+# Make sure there are no negative trip durations
+trip_data <- trip_data %>% 
+  mutate(duration_minutes = ifelse(duration_minutes < 0, NA, duration_minutes))
+
+# Determine if the bike is returned to the same station
+trip_data <- trip_data %>% 
+  mutate(start_end_lng_same = (end_lng == start_lng),
+         start_end_lat_same = (end_lat == start_lat),
+         start_end_same = (start_end_lng_same == TRUE & start_end_lat_same==TRUE))
+
+# Create a column for start and end stations
+trip_data <- trip_data %>% 
+  mutate(start_end_names = paste(start_station_name, "to", end_station_name))
+
+# Create a column for month and time of day
+trip_data <- trip_data %>% 
+  mutate(
+    weekday = wday(started_at, label = TRUE, abbr = TRUE),  # Extract weekday (abbreviated)
+    month = month(started_at, label = TRUE, abbr = TRUE),    # Extract month (abbreviated)
+    hour_of_day = hour(started_at)  # Extract hour of day
+  )
+```
+
+
+# Summary of Analysis
+
+## Question 1: How do total number of rides, bike type, and trip duration differ between casual riders and annual members?
+
+Approach: Calculate the mean duration of bike ride and number of bike rides by member type and bike type.
+
+```{r, message=F, warning=F, echo=F}
+# Calculate the mean duration of bike ride by member type and bike type:
+trip_data %>% 
+  group_by(member_casual)%>% 
+  summarize(mean_duration_minutes = round(mean(duration_minutes, na.rm=TRUE), 1),
+            count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))
+trip_data %>% 
+  group_by(member_casual, rideable_type)%>% 
+  summarize(mean_duration_minutes = round(mean(duration_minutes, na.rm=TRUE), 1),
+            count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))
+```
+### Results:
+
+* Casual riders make up 36.8% of total rides, and annual members make up 63.2% of total rides. 
+* Electric bikes are the most-used, while electric scooters are the least-used type of ride for both casual riders and annual members. 
+* Ride duration differs between member types on classic bikes. Casual members on classic bikes have over two times longer rides (29.4 minutes) compared to annual members on classic bikes (13.4 minutes). The ride duration is about the same between member types for electric bikes (14.5 vs. 13.4 minutes for casual vs. annual members) and electric scooters (11.9 vs. 8.2 minutes for casual vs. annual members).
+
+
+## Question 2: How do start and end locations differ between casual riders and annual members?
+
+Approach: Determine the most popular starting stations by member type.
+
+```{r, message=F, warning=F, echo=F}
+# Determine the most popular starting stations for casual vs. member riders:
+start_station <- trip_data %>% 
+  group_by(member_casual, start_station_name, start_lat, start_lng) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+start_station
+
+# Determine the most popular ending stations for casual vs. member riders:
+end_station <- trip_data %>% 
+  group_by(member_casual, end_station_name, end_lat, end_lng) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+end_station
+unnamed <- end_station %>% 
+  filter(is.na(end_station_name))
+
+# Determine how often riders return to the same station by member type:
+start_end_station <- trip_data %>% 
+  group_by(member_casual, start_end_same) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+start_end_station
+```
+
+### Results:
+
+* The most popular start and end stations for casual riders include Streeter Dr & Grand Ave, DuSable Lake Shore Dr & Monroe St, and Michigan Ave & Oak St.
+* The most popular start and end stations for annual members include Kingsbury St & Kinzie St, Clinton St & Washington Blvd, and Clark St & Elm St.
+* One of the most popular start stations for annual members does not have a name (41.89000 N,	-87.63000 W).
+* Annual members are much more likely to return to a different station as the start station compared to casual riders.
+
+
+## Question 3: How do monthly rides differ between casual riders and annual members?
+
+Approach: Determine the most popular month, day of week, and time of day for bike rides by member type.
+
+```{r, message=F, warning=F, echo=F}
+# Determine the most popular month by member type:
+month_data <- trip_data %>% 
+  group_by(member_casual, month) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+month_data
+
+# Determine the most popular day of the week by member type:
+day_data <- trip_data %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+day_data
+
+# Determine the most popular hour of day by member type:
+hour_data <- trip_data %>% 
+  group_by(member_casual, hour_of_day) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1))  %>% 
+  arrange(desc(count)) 
+hour_data
+```
+
+### Results:
+
+* The most popular time of year to ride is May-October (with September being the most popular month) for both member types.
+* Annual members ride most often during the work week, with Tuesday and Wednesday being the most popular days. However, casual members ride most often during the weekend, with Saturday and Sunday being the most popular days.
+* Annual members ride most often during rush hour, at 4-6 PM and 8 AM. Casual members also ride most often during 4-6PM, but also ride often at 2-3PM.
+
+
+# Visualizations & Key Findings
+
+## 1. Casual riders take longer rides on classic bikes comapred to annual members, but have similar ride duration to annual members using electric bikes.
+```{r, message=F, warning=F, echo=F}
+
+trip_data %>% 
+  group_by(member_casual, rideable_type)%>% 
+  summarize(mean_duration_minutes = (mean(duration_minutes, na.rm=TRUE)),
+            count = n()) %>%   
+  ggplot(aes(x = rideable_type, y = mean_duration_minutes, color = member_casual, group = member_casual)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Average ride duration") +
+  labs (x="Condition",y="Average ride duration (minutes)", color="Member type") +
+  theme_classic() 
+```
+
+## 2. Casual riders tend to start their bike rides on the Downtown waterfront, while annual members tend to start their bike rides inland from downtown and near Hyde Park. Further, casual riders are much more likely to return their bikes to the same station they retrieved from.
+
+```{r, message=F, warning=F, echo=F}
+# Load necessary libraries
+library(ggplot2)
+library(maps)
+library(mapdata)
+library(ggrepel)
+
+# Define major areas and their coordinates
+major_areas <- data.frame(
+  name = c("Downtown", "Hyde Park", "Wrigleyville", "Chinatown", "Pilsen", "Lincoln Park"),
+  lon = c(-87.6244, -87.5842, -87.656, -87.631, -87.672, -87.638),
+  lat = c(41.8819, 41.7943, 41.9484, 41.8525, 41.8564, 41.9214)
+)
+
+
+# Get Illinois map data
+illinois_map <- map_data("county") %>% 
+  subset(region == "illinois")
+
+# Plot Chicago area with start stations
+ggplot() +
+  geom_polygon(data = illinois_map, aes(x = long, y = lat, group = group), 
+               fill = "lightgray", color = "black") +
+  coord_map() +
+    coord_sf(xlim = c(-87.75, -87.55), ylim = c(41.75, 41.97), expand = FALSE) +
+  labs(title = "Map of Chicago, Illinois") +
+  # add major areas of Chicago
+    geom_point(data = major_areas, aes(x = lon, y = lat), color = "black", size = 3) +
+  geom_text(data = major_areas, aes(x = lon+0.005, y = lat, label = name), 
+                  size = 3, fontface = "bold", color = "black", hjust=0, vjust=0) +
+   labs(title = "Chicago, IL: Most popular start stations", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  # add bike stations
+  geom_point(data = start_station[1:10,], aes(x = start_lng, y = start_lat), color = "blue", size = 3) +
+    geom_text_repel(data = start_station[1:10,], aes(x = start_lng-0.005, y = start_lat, label = start_station_name), 
+                  size = 2, fontface = "italic", color = "blue") +
+  # divide into two plots (casual/member)
+  facet_wrap(member_casual~., labeller = as_labeller(c("casual" = "Casual riders", "member" = "Annual members"))) +
+  theme(panel.background = element_rect(fill = "lightblue", color = NA),# color the ocean light blue
+        axis.text.x = element_text(angle = -45, hjust=0),  # Rotate labels 45 degrees
+        panel.border = element_rect(color = "black", fill = NA, size = 1), # create panel border
+        panel.spacing = unit(2, "lines")  ) 
+
+# Plot Chicago area with end stations
+ggplot() +
+  geom_polygon(data = illinois_map, aes(x = long, y = lat, group = group), 
+               fill = "lightgray", color = "black") +
+  coord_map() +
+    coord_sf(xlim = c(-87.75, -87.55), ylim = c(41.75, 41.97), expand = FALSE) +
+  labs(title = "Map of Chicago, Illinois") +
+  # add major areas of Chicago
+    geom_point(data = major_areas, aes(x = lon, y = lat), color = "black", size = 3) +
+  geom_text(data = major_areas, aes(x = lon+0.005, y = lat, label = name), 
+                  size = 3, fontface = "bold", color = "black", hjust=0, vjust=0) +
+   labs(title = "Chicago, IL: Most popular end stations", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  # add bike stations
+  geom_point(data = end_station[1:10,], aes(x = end_lng, y = end_lat), color = "red4", size = 3) +
+    geom_text_repel(data = end_station[1:10,], aes(x = end_lng-0.005, y = end_lat, label = end_station_name), 
+                  size = 2, fontface = "italic", color = "red4") +
+  # divide into two plots (casual/member)
+  facet_wrap(member_casual~., labeller = as_labeller(c("casual" = "Casual riders", "member" = "Annual members"))) +
+  theme(panel.background = element_rect(fill = "lightblue", color = NA),# color the ocean light blue
+        axis.text.x = element_text(angle = -45, hjust=0),  # Rotate labels 45 degrees
+        panel.border = element_rect(color = "black", fill = NA, size = 1), # create panel border
+        panel.spacing = unit(2, "lines")  ) 
+
+trip_data %>% 
+  group_by(member_casual, start_end_same) %>% 
+  summarize(count = n()) %>% 
+  mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1),
+         member_by_returntosame = paste(member_casual, start_end_same))  %>%
+  mutate(member_by_returntosame = case_match(member_by_returntosame,
+                              "casual FALSE" ~ "Casual return to different",
+                              'casual TRUE' ~ 'Casual return to same',
+                              'member FALSE' ~ 'Member return to different',
+                              'member TRUE' ~ 'Member return to same')) %>% 
+  ggplot(aes(x="", y=percent_of_rides, fill=member_by_returntosame)) + 
+  geom_bar(stat="identity", width=1) +
+  geom_label(aes(label=percent_of_rides), position=position_stack(vjust=0.5), show.legend = F) +
+  labs(fill="Member type and return") +
+  coord_polar("y", start=0)+
+  theme_void()
+
+```
+
+## 3. ...(most popular month, day of week, and time of day by member type).
+
+
+# Recommendations 
+In order to switch casual riders to annual members:
+
+1. 
+
+2. 
+
+3. 
+
+
+
