@@ -48,8 +48,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# ignore files
 case study 1/Case Study 1_How does a bike-share navigate speedy success.pdf
-case study 2
-case study 3
+case study 2/
+case study 3/
 
 
