@@ -1,5 +1,5 @@
 ---
-title: "Cyclistic annual members vs. casual riders"
+title: "Divvy annual members vs. casual riders"
 author: "Rachel Wooliver"
 date: "2025-03-27"
 output: pdf_document
@@ -7,7 +7,7 @@ output: pdf_document
 
 # Business Task
 
-Cyclistic is a bikeshare company that would like to convert casual riders that pay per-ride or per-day into annual members that pay an annual fee. Annual memberships are both more cost-effective for customers and profitable for Cyclistic. So, the business task is to **determine how annual members use bikes differently from casual riders, and develop data-driven insights to convert casual riders into annual members**.
+Divvy is a bikeshare company that would like to convert casual riders that pay per-ride or per-day into annual members that pay an annual fee. Annual memberships are both more cost-effective for customers and profitable for Divvy. So, the business task is to **determine how annual members use bikes differently from casual riders, and develop data-driven insights to convert casual riders into annual members**.
 
 
 # Data Sources
@@ -15,12 +15,12 @@ Cyclistic is a bikeshare company that would like to convert casual riders that p
 The data have been made available by Motivate International Inc. under this [license](https://divvybikes.com/data-license-agreement). This data source seems to be: 
 
 * reliable (accurate, complete, and unbiased)
-* original (produced first-hand by Divvy Bikes)
+* original (produced first-hand by Divvy)
 * comprehensive (includes all bike rides from all times (times/days/months) and stations (across Chicago))
 * current (updated regularly) 
-* cited (it is publicly available by Divvy Bikes)
+* cited (it is publicly available by Divvy)
 
-*Note that riders’ personally identifiable information is not publicly available. This means that we will not be able to connect past purchases to credit card numbers to determine if casual riders live in the Cyclistic service area or if they have purchased multiple single passes.*
+*Note that riders’ personally identifiable information is not publicly available. This means that we will not be able to connect past purchases to credit card numbers to determine if casual riders live in the Divvy service area or if they have purchased multiple single passes.*
 
 Approach: 
 
@@ -190,7 +190,7 @@ hour_data
 
 # Visualizations & Key Findings
 
-## 1. Casual riders take longer rides on *classic* bikes comapared to annual members, but have similar ride duration to annual members using electric bikes.
+## 1. Casual riders take longer rides on *classic bikes* comapared to annual members, but have similar ride duration to annual members using electric bikes and scooters.
 ```{r, message=F, warning=F, echo=F}
 
 trip_data %>% 
@@ -199,13 +199,13 @@ trip_data %>%
             count = n()) %>%   
   ggplot(aes(x = rideable_type, y = mean_duration_minutes, color = member_casual, group = member_casual)) +
   geom_point() +
-  geom_line() +
+  geom_line(size=2) + lims(y=c(0,30)) +
   labs(title = "Average ride duration") +
   labs (x="Condition",y="Average ride duration (minutes)", color="Member type") +
   theme_classic() 
 ```
 
-## 2. Casual riders tend to start their bike rides on the *Downtown waterfront*, while annual members tend to start their bike rides inland from downtown and near Hyde Park. Further, casual riders are much more likely to return their bikes to the same station they retrieved from.
+## 2. Casual riders tend to start their bike rides on the *Downtown waterfront*, while annual members tend to start their bike rides *inland from downtown and near Hyde Park*. Further, although a majority of riders return their bikes to a different station than they retrieved from, casual riders are more likely than annual members to return their bikes to the same station they retrieved from.
 
 ```{r, message=F, warning=F, echo=F}
 # Load necessary libraries
@@ -233,19 +233,18 @@ ggplot() +
                fill = "lightgray", color = "black") +
   coord_map() +
     coord_sf(xlim = c(-87.72, -87.535), ylim = c(41.78, 41.97), expand = FALSE) +
-  labs(title = "Map of Chicago, Illinois") +
   # add major areas of Chicago
     geom_point(data = major_areas, aes(x = lon, y = lat), color = "black", size = 3, alpha=0.5) +
   geom_text(data = major_areas, aes(x = lon+0.005, y = lat, label = name), 
                   size = 3, fontface = "bold", color = "black", hjust=0, vjust=0, alpha=0.5) +
-   labs(title = "Chicago, IL: Most popular start stations", x = "Longitude", y = "Latitude") +
   theme_minimal() +
   # add bike stations
-  geom_point(data = start_station[1:20,], aes(x = start_lng, y = start_lat), color = "blue", size = 3) +
+  geom_point(data = start_station[1:20,], aes(x = start_lng, y = start_lat, , fill=member_casual), color="black", size = 3, shape=21) +
     geom_text_repel(data = start_station[1:20,], aes(x = start_lng-0.005, y = start_lat, label = start_station_name), 
-                  size = 2, fontface = "italic", color = "blue") +
+                  size = 2, fontface = "italic") +
+   labs(title = "Chicago, IL: Most popular start stations", x = "Longitude", y = "Latitude") + guides(fill=F) +
   # divide into two plots (casual/member)
-  facet_wrap(member_casual~., labeller = as_labeller(c("casual" = "Casual riders", "member" = "Annual members"))) +
+  facet_wrap(member_casual~., labeller = as_labeller(c("member" = "Annual members", "casual" = "Casual riders"))) +
   theme(panel.background = element_rect(fill = "lightblue", color = NA),# color the ocean light blue
         axis.text.x = element_text(angle = 45, hjust=1),  # Rotate labels 45 degrees
         panel.border = element_rect(color = "black", fill = NA, size = 1), # create panel border
@@ -280,19 +279,18 @@ ggplot() +
                fill = "lightgray", color = "black") +
   coord_map() +
     coord_sf(xlim = c(-87.72, -87.535), ylim = c(41.78, 41.97), expand = FALSE) +
-  labs(title = "Map of Chicago, Illinois") +
   # add major areas of Chicago
     geom_point(data = major_areas, aes(x = lon, y = lat), color = "black", size = 3, alpha=0.5) +
   geom_text(data = major_areas, aes(x = lon+0.005, y = lat, label = name), 
                   size = 3, fontface = "bold", color = "black", hjust=0, vjust=0, alpha=0.5) +
-   labs(title = "Chicago, IL: Most popular end stations", x = "Longitude", y = "Latitude") +
   theme_minimal() +
   # add bike stations
-  geom_point(data = end_station[1:20,], aes(x = end_lng, y = end_lat), color = "red4", size = 3) +
+  geom_point(data = end_station[1:20,], aes(x = end_lng, y = end_lat, fill=member_casual), color="black", size = 3, shape=21) +
     geom_text_repel(data = end_station[1:20,], aes(x = end_lng-0.005, y = end_lat, label = end_station_name), 
-                  size = 2, fontface = "italic", color = "red4") +
+                  size = 2, fontface = "italic") +
+   labs(title = "Chicago, IL: Most popular end stations", x = "Longitude", y = "Latitude") + guides(fill=F) +
   # divide into two plots (casual/member)
-  facet_wrap(member_casual~., labeller = as_labeller(c("casual" = "Casual riders", "member" = "Annual members"))) +
+  facet_wrap(member_casual~., labeller = as_labeller(c("member" = "Annual members", "casual" = "Casual riders"))) +
   theme(panel.background = element_rect(fill = "lightblue", color = NA),# color the ocean light blue
         axis.text.x = element_text(angle = 45, hjust=1),  # Rotate labels 45 degrees
         panel.border = element_rect(color = "black", fill = NA, size = 1), # create panel border
@@ -304,10 +302,10 @@ trip_data %>%
   mutate(percent_of_rides = round(100*count/dim(trip_data)[1], 1),
          member_by_returntosame = paste(member_casual, start_end_same))  %>%
   mutate(member_by_returntosame = case_match(member_by_returntosame,
-                              "casual FALSE" ~ "Casual return to different",
-                              'casual TRUE' ~ 'Casual return to same',
                               'member FALSE' ~ 'Member return to different',
-                              'member TRUE' ~ 'Member return to same')) %>% 
+                              "casual FALSE" ~ "Casual return to different",
+                              'member TRUE' ~ 'Member return to same',
+                              'casual TRUE' ~ 'Casual return to same')) %>% 
   ggplot(aes(x="", y=percent_of_rides, fill=member_by_returntosame)) + 
   geom_bar(stat="identity", width=1) +
   geom_label(aes(label=percent_of_rides), position=position_stack(vjust=0.5), show.legend = F) +
@@ -326,6 +324,7 @@ month_data$member_casual <- factor(month_data$member_casual,
                                    levels = c( "member", "casual"), 
                                    labels = c("Annual members", "Casual riders"))
 ggplot(month_data, aes(x=month, y=percent_of_rides, group=member_casual)) + 
+  geom_vline(xintercept = c(1:23), alpha=0.05)+ 
     geom_area(alpha=0.6 , size=1, colour="black", aes(fill=member_casual)) +
   labs(fill="Member type", x="Month", y="Percent of rides", title="Stacked area plot of rides across months of the year") +   theme_classic() 
 ```
@@ -339,6 +338,7 @@ day_data$member_casual <- factor(day_data$member_casual,
                                    levels = c( "member", "casual"), 
                                    labels = c("Annual members", "Casual riders"))
 ggplot(day_data, aes(x=weekday, y=percent_of_rides, group=member_casual)) + 
+  geom_vline(xintercept = c(1:23), alpha=0.05)+ 
     geom_area(alpha=0.6 , size=1, colour="black", aes(fill=member_casual)) +
   labs(fill="Member type", x="Day", y="Percent of rides", title="Stacked area plot of rides across days of the week") +  
   theme_classic() 
@@ -367,7 +367,7 @@ ggplot(hour_data, aes(x=hour_of_day, y=percent_of_rides, group=member_casual)) +
 # Recommendations 
 In order to switch casual riders to annual members:
 
-1. Casual riders are likely riding with their families or significant others, because they take more time on classic bikes compared to annual members. Offer "kids-bike-free" or "plus-one-bikes-free" promotions to riders who sign up for annual memberships.
+1. Casual riders take more time on classic bikes compared to annual members, so they are likely taking leisure rides with their families or significant others. Offer "kids-bike-free" or "plus-one-bikes-free" promotions to riders who sign up for annual memberships.
 
 2. Casual riders are most active at the Downtown waterfront, and more likely to return their bikes to the same station. Prioritize advertisements for annual memberships at bike stations near Downtown waterfront as opposed to other areas.  
 
